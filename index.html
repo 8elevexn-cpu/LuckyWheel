@@ -221,7 +221,14 @@
                     <label class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-folder-open"></i>轉盤庫與切換
                     </label>
-                    <div class="flex gap-1.5">
+                    <div class="flex gap-1.5 flex-wrap justify-end">
+                        <button id="exportWheelsBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-2 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1" title="備份並匯出所有轉盤資料">
+                            <i class="fa-solid fa-download text-amber-400"></i>匯出
+                        </button>
+                        <button id="importWheelsBtn" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/80 px-2 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1" title="匯入備份轉盤檔案">
+                            <i class="fa-solid fa-upload text-amber-400"></i>匯入
+                        </button>
+                        <input type="file" id="importFileInput" accept=".json" class="hidden">
                         <button id="openAddWheelModalBtn" class="bg-amber-500 hover:bg-amber-400 text-slate-950 px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 shadow">
                             <i class="fa-solid fa-plus"></i>新增轉盤
                         </button>
@@ -535,6 +542,10 @@
         const confirmAddWheelBtn = document.getElementById('confirmAddWheelBtn');
         const newWheelNameInput = document.getElementById('newWheelNameInput');
         const wheelPresetSelect = document.getElementById('wheelPresetSelect');
+
+        const exportWheelsBtn = document.getElementById('exportWheelsBtn');
+        const importWheelsBtn = document.getElementById('importWheelsBtn');
+        const importFileInput = document.getElementById('importFileInput');
 
         let isSimulatedFullscreen = false;
 
@@ -986,6 +997,58 @@
             loadActiveWheelToForm();
             saveWheelsToLocalStorage();
             showToast(`已刪除轉盤「${current.title}」`, 'info');
+        });
+
+        // Export Wheels Handler
+        function exportWheelsData() {
+            syncCurrentFormToState();
+            const exportPayload = {
+                wheels: wheelsState,
+                activeId: activeWheelId,
+                exportedAt: new Date().toISOString()
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            const dateSuffix = new Date().toISOString().slice(0, 10);
+            downloadAnchor.setAttribute("download", `lucky_wheels_backup_${dateSuffix}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showToast('轉盤資料已成功匯出存檔！', 'success');
+        }
+
+        // Import Wheels Handler
+        function importWheelsData(file) {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (importedData && Array.isArray(importedData.wheels) && importedData.wheels.length > 0) {
+                        wheelsState = importedData.wheels;
+                        activeWheelId = importedData.activeId || wheelsState[0].id;
+                        saveWheelsToLocalStorage();
+                        loadActiveWheelToForm();
+                        showToast('轉盤資料已順利匯入並還原！', 'success');
+                    } else {
+                        showToast('匯入檔案格式不符，無法解析轉盤資料', 'warning');
+                    }
+                } catch (err) {
+                    showToast('匯入失敗：檔案非有效的 JSON 格式', 'warning');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        exportWheelsBtn.addEventListener('click', exportWheelsData);
+        importWheelsBtn.addEventListener('click', () => importFileInput.click());
+        importFileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files[0]) {
+                importWheelsData(e.target.files[0]);
+                e.target.value = ''; // reset file input for future uses
+            }
         });
 
         // Explicit Save Button Handler
